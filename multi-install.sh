@@ -129,7 +129,7 @@ if [ $install = alpine ]; then
 	tarurl="https://nl.alpinelinux.org/alpine/${release}/releases/${arch}/alpine-minirootfs-3.7.0-${arch}.tar.gz"
 	sumurl="${tarurl}.sha256"
 elif [ $install = fedora ]; then
-	[ $arch = x86 ] && { echo "No x86 fedora image available; exit 1; }
+	[ $arch = x86 ] && { echo "No x86 fedora image available"; exit 1; }
 	[ $arch = armhf ] && arch=armhfp
 	[ $arch = aarch64 ] && secdir="-secondary"
 	tarurl="https://download.fedoraproject.org/pub/fedora%{secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker-Base-${release}-${secondaryopt}.${arch}.tar.xz"
