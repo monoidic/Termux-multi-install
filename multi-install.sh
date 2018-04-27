@@ -6,10 +6,12 @@
 #set -x
 set -e
 
-availabledists="alpine, fedora, ubuntu"
+availabledists="alpine, fedora, slackware, ubuntu"
+## tested and didn't work very well: debian (debootstrap)
 
 error() {
 	echo "$1"
+	cd
 	rm -r "$prefixdir"
 	exit 1
 }
@@ -82,6 +84,9 @@ while true; do
 		[Ff]*) install=fedora
 			releases="[26], 27"
 			break ;;
+		[Ss]*) install=slackware
+			releases="[current]"
+			break ;;
 		[Uu]*) install=ubuntu
 			releases="trusty(14.04), xenial(16.04), [artful(17.10)], bionic(18.04)"
 			break ;;
@@ -103,6 +108,9 @@ esac
 	*7*) release="27"; secondaryopt="1.6" ;;
 	*6*|*) release="26"; secondaryopt="1.5" ;;
 esac
+[ $install = slackware ] && case "$_release" in
+	*) release="current" ;;
+esac
 [ $install = ubuntu ] && case "$_release" in
 	*14*|[Tt]*) release="trusty" ;;
 	*16*|[Xx]*) release="xenial" ;;
@@ -113,12 +121,12 @@ esac
 prefixdir="prefixes/${install}-${release}"
 
 if [ -d "$prefixdir" ]; then
-	echo "This prefix already exists. Would you like to remove it?"
-	echo -en "(no will attempt to overwrite it)\n(yN)"
+	echo "This prefix already exists. Would you like to remove it first?"
+	echo -en "(no will attempt to overwrite it in-place)\n(Yn)"
 	read rmprefix
 	case "$rmprefix" in
-		[Yy]*) chmod -R 777 "$prefixdir"; rm -rf "$prefixdir"; exit ;;
-		[Nn]*|*) : ;;
+		[Nn]*) : ;;
+		[Yy]*|*) chmod -R 777 "$prefixdir"; rm -rf "$prefixdir" ;;
 	esac
 fi
 mkdir -p "$prefixdir"
@@ -127,28 +135,32 @@ echo "Downloading archive and checksums..."
 
 if [ $install = alpine ]; then
 	tarurl="https://nl.alpinelinux.org/alpine/${release}/releases/${arch}/alpine-minirootfs-3.7.0-${arch}.tar.gz"
-	sumurl="${tarurl}.sha256"
+	sumurl="${tarurl}.sha512"
+	sum="sha512sum"
 elif [ $install = fedora ]; then
 	[ $arch = x86 ] && { echo "No x86 fedora image available"; exit 1; }
 	[ $arch = armhf ] && arch=armhfp
 	[ $arch = aarch64 ] && secdir="-secondary"
 	tarurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker-Base-${release}-${secondaryopt}.${arch}.tar.xz"
 	sumurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker-${release}-${secondaryopt}-${arch}-CHECKSUM"
+	sum="sha256sum"
+elif [ $install = slackware ]; then
+	[[ $arch =~ x86 ]] && { echo "No x86(_64) slackware image available"; exit 1; }
+	[ $arch = armhf ] && { tarurl="https://ftp.slackware.pl/pub/slackwarearm/slackwarearm-devtools/minirootfs/roots/slack-current-miniroot_12Apr18.tar.xz"; sumurl="https://ftp.slackware.pl/pub/slackwarearm/slackwarearm-devtools/minirootfs/roots/slack-current-miniroot_details.txt"; }
+	[ $arch = aarch64 ] && { tarurl="http://dl.fail.pp.ua/slackware/minirootfs/slack-current-aarch64-miniroot_14Apr18.tar.xz"; sumurl="http://dl.fail.pp.ua/slackware/minirootfs/slack-current-aarch64-miniroot_14Apr18_details.txt" ; }
+	sum="sha1sum"
 elif [ $install = ubuntu ]; then
 	[ $arch = aarch64 ] && arch=arm64
 	[ $arch = x86 ] && arch=i386
 	[ $arch = x86_64 ] && arch=amd64
 	tarurl="https://partner-images.canonical.com/core/${release}/current/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
 	sumurl="https://partner-images.canonical.com/core/${release}/current/SHA256SUMS"
+	sum="sha1sum"
 fi
 
-## manually set nofetch, to not get the archive+sum, for debugging, I guess
-## expects the files to be in the correct place already
-if [ -z $nofetch ]; then
-	wget $tarurl && wget $sumurl -O sha2sum || error "Error fetching files"
-fi
+wget $tarurl && wget $sumurl -O checksum || error "Error fetching files"
 
-sha256sum --ignore-missing --check sha2sum || error "Checksum error"
+$sum --ignore-missing --check checksum || error "Checksum error"
 tarfile=*.tar.*z
 echo -e "\nExtracting prefix..."
 if [ $install = fedora ]; then
@@ -161,7 +173,7 @@ else
 fi
 
 ## cleanup
-rm $tarfile sha2sum
+rm $tarfile checksum
 
 ## touchups
 echo "Adding users/groups/DNS..."
@@ -169,20 +181,20 @@ username=$(id -un)
 userid=$(id -u)
 
 cat >> etc/group <<- EOF
-	ident:x:3003:
-	everybody:x:9997:
-	${username}_cache:x:$((userid + 10000)):
-	all_a$((userid - 10000)):x:$((userid + 40000)):
-	user:x:${userid}:
+ident:x:3003:
+everybody:x:9997:
+${username}_cache:x:$((userid + 10000)):
+all_a$((userid - 10000)):x:$((userid + 40000)):
+user:x:${userid}:
 EOF
 
-cat >> etc/passwd <<- EOF
-	user:x:${userid}:${userid}::/home:/bin/sh
+cat >> etc/passwd << EOF
+user:x:${userid}:${userid}::/home:/bin/sh
 EOF
 
-cat > etc/resolv.conf <<- EOF
-	nameserver 1.1.1.1
-	nameserver 1.0.0.1
+cat > etc/resolv.conf << EOF
+nameserver 1.1.1.1
+nameserver 1.0.0.1
 EOF
 
 ## entry script
@@ -190,18 +202,18 @@ cd
 echo "Creating entry script in ~/bin"
 mkdir -p bin
 script="bin/start-${install}-${release}"
-cat > "$script" <<- EOF
-	#!/bin/bash
+cat > "$script" << EOF
+#!/bin/bash
 
-	unset LD_PRELOAD
-	exec proot --link2symlink \
-	\$([ -z \$@ ] && echo "-0") \
-	-r $(realpath "$prefixdir") \
-	-b $HOME -b /dev -b /proc -b /storage -b /sys -w / \
-	/usr/bin/env -i HOME=/root TERM=\$TERM LANG=en_US.UTF-8 \
-	PATH=/bin:/usr/bin:/sbin:/usr/sbin \
-	$([ $install = alpine ] && echo /bin/sh || echo /bin/bash) \
-	--login
+unset LD_PRELOAD
+exec proot --link2symlink \
+\$([ -z \$@ ] && echo "-0") \
+-r $(realpath "$prefixdir") \
+-b $HOME -b /dev -b /proc -b /storage -b /sys -w / \
+/usr/bin/env -i HOME=/root TERM=\$TERM LANG=en_US.UTF-8 \
+PATH=/bin:/usr/bin:/sbin:/usr/sbin \
+$([ $install = alpine ] && echo /bin/sh || echo /bin/bash) \
+--login
 EOF
 
 termux-fix-shebang "$script"
