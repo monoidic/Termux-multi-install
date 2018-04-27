@@ -155,7 +155,7 @@ elif [ $install = ubuntu ]; then
 	[ $arch = x86_64 ] && arch=amd64
 	tarurl="https://partner-images.canonical.com/core/${release}/current/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
 	sumurl="https://partner-images.canonical.com/core/${release}/current/SHA256SUMS"
-	sum="sha1sum"
+	sum="sha256sum"
 fi
 
 wget $tarurl && wget $sumurl -O checksum || error "Error fetching files"
