@@ -7,7 +7,7 @@
 set -e
 
 availabledists="alpine, fedora, slackware, ubuntu"
-## tested and didn't work very well: debian (debootstrap)
+## tested and didn't work very well: debian (debootstrap and experimental rootfs)
 
 error() {
 	echo "$1"
@@ -155,7 +155,7 @@ elif [ $install = ubuntu ]; then
 	[ $arch = x86_64 ] && arch=amd64
 	tarurl="https://partner-images.canonical.com/core/${release}/current/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
 	sumurl="https://partner-images.canonical.com/core/${release}/current/SHA256SUMS"
-	sum="sha256sum"
+	sum="sha1sum"
 fi
 
 wget $tarurl && wget $sumurl -O checksum || error "Error fetching files"
