@@ -132,7 +132,7 @@ elif [ $install = fedora ]; then
 	[ $arch = x86 ] && { echo "No x86 fedora image available"; exit 1; }
 	[ $arch = armhf ] && arch=armhfp
 	[ $arch = aarch64 ] && secdir="-secondary"
-	tarurl="https://download.fedoraproject.org/pub/fedora%{secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker-Base-${release}-${secondaryopt}.${arch}.tar.xz"
+	tarurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker-Base-${release}-${secondaryopt}.${arch}.tar.xz"
 	sumurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker-${release}-${secondaryopt}-${arch}-CHECKSUM"
 elif [ $install = ubuntu ]; then
 	[ $arch = aarch64 ] && arch=arm64
