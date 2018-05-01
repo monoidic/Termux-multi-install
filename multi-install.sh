@@ -6,7 +6,7 @@
 #set -x
 set -e
 
-availabledists="alpine, fedora, slackware, ubuntu"
+availabledists="alpine, fedora, gentoo, slackware, ubuntu"
 ## tested and didn't work very well: debian (debootstrap and experimental rootfs)
 
 error() {
@@ -57,7 +57,7 @@ case "`getprop ro.product.cpu.abi`" in
 		;;
 esac
 
-chkpak proot wget tar coreutils
+chkpak proot wget tar coreutils grep
 
 
 
@@ -84,6 +84,9 @@ while true; do
 		[Ff]*) install=fedora
 			releases="[26], 27"
 			break ;;
+		[Gg]*) install=gentoo
+			releases="[current]"
+			break ;;
 		[Ss]*) install=slackware
 			releases="[current]"
 			break ;;
@@ -108,9 +111,8 @@ esac
 	*7*) release="27"; secondaryopt="1.6" ;;
 	*6*|*) release="26"; secondaryopt="1.5" ;;
 esac
-[ $install = slackware ] && case "$_release" in
-	*) release="current" ;;
-esac
+[ $install = gentoo ] && release="current"
+[ $install = slackware ] && release="current"
 [ $install = ubuntu ] && case "$_release" in
 	*14*|[Tt]*) release="trusty" ;;
 	*16*|[Xx]*) release="xenial" ;;
@@ -141,33 +143,52 @@ elif [ $install = fedora ]; then
 	[ $arch = x86 ] && { echo "No x86 fedora image available"; exit 1; }
 	[ $arch = armhf ] && arch=armhfp
 	[ $arch = aarch64 ] && secdir="-secondary"
-	tarurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker-Base-${release}-${secondaryopt}.${arch}.tar.xz"
-	sumurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker-${release}-${secondaryopt}-${arch}-CHECKSUM"
+	baseurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker"
+	tarurl="${baseurl}-Base-${release}-${secondaryopt}.${arch}.tar.xz"
+	sumurl="${baseurl}-${release}-${secondaryopt}-${arch}-CHECKSUM"
 	sum="sha256sum"
+elif [ $install = gentoo ]; then
+	[ $arch = aarch64 ] && tarurl="https://gentoo.osuosl.org/experimental/arm64/stage3-arm64-20180305.tar.bz2"
+	[ $arch = armhf ] && { arch=arm; secdir="armv7a_hardfp"; }
+	[ $arch = x86_64 ] && { arch=amd64; secdir=amd64; }
+	[ $arch = x86 ] && secdir=i686
+	[ -z $tarurl ] {
+		baseurl="https://gentoo.osuosl.org/releases/${arch}/autobuilds/"
+		tarurl=$(curl "${baseurl}/latest-stage3-${secdir}.txt" | grep -o "^.*stage3-${secdir}-.*.tar.\w*")
+		tarurl="${baseurl}${tarurl}"
+	}
+	sumurl="${tarurl}.DIGESTS"
 elif [ $install = slackware ]; then
 	[[ $arch =~ x86 ]] && { echo "No x86(_64) slackware image available"; exit 1; }
-	[ $arch = armhf ] && { tarurl="https://ftp.slackware.pl/pub/slackwarearm/slackwarearm-devtools/minirootfs/roots/slack-current-miniroot_12Apr18.tar.xz"; sumurl="https://ftp.slackware.pl/pub/slackwarearm/slackwarearm-devtools/minirootfs/roots/slack-current-miniroot_details.txt"; }
-	[ $arch = aarch64 ] && { tarurl="http://dl.fail.pp.ua/slackware/minirootfs/slack-current-aarch64-miniroot_14Apr18.tar.xz"; sumurl="http://dl.fail.pp.ua/slackware/minirootfs/slack-current-aarch64-miniroot_14Apr18_details.txt" ; }
+	[ $arch = armhf ] && {
+		baseurl"https://ftp.slackware.pl/pub/slackwarearm/slackwarearm-devtools/minirootfs/roots/slack-current-miniroot"
+		tarurl="${baseurl}_12Apr18.tar.xz"
+		sumurl="${baseurl}_details.txt"
+	}
+	[ $arch = aarch64 ] && {
+		baseurl="http://dl.fail.pp.ua/slackware/minirootfs/slack-current-aarch64-miniroot"
+		tarurl="${baseurl}_14Apr18.tar.xz"
+		sumurl="${baseurl}_14Apr18_details.txt"
+	}
 	sum="sha1sum"
 elif [ $install = ubuntu ]; then
 	[ $arch = aarch64 ] && arch=arm64
 	[ $arch = x86 ] && arch=i386
 	[ $arch = x86_64 ] && arch=amd64
-	tarurl="https://partner-images.canonical.com/core/${release}/current/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
-	sumurl="https://partner-images.canonical.com/core/${release}/current/SHA256SUMS"
+	baseurl="https://partner-images.canonical.com/core/${release}/current"
+	tarurl="${baseurl}/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
+	sumurl="${baseurl}/SHA256SUMS"
 	sum="sha256sum"
 fi
 
 wget $tarurl && wget $sumurl -O checksum || error "Error fetching files"
 
 $sum --ignore-missing --check checksum || error "Checksum error"
-tarfile=*.tar.*z
+tarfile=*.tar.*
 echo -e "\nExtracting prefix..."
 if [ $install = fedora ]; then
-	tar xf $tarfile --strip-components=1 --exclude json --exclude VERSION
-	tar xpf layer.tar
+	tar xf $tarfile --strip-components=1 --exclude json --exclude VERSION | tar xp
 	chmod +w .
-	rm layer.tar
 else
 	proot --link2symlink -0 tar xpf $tarfile 2> /dev/null || :
 fi
@@ -196,6 +217,47 @@ cat > etc/resolv.conf << EOF
 nameserver 1.1.1.1
 nameserver 1.0.0.1
 EOF
+
+if [ $install = gentoo ]; then
+	(
+	cd etc/portage
+	mkdir -p env package.env package.use profile
+	cat >> make.conf < EOF
+CFLAGS="-O2 -pipe -march=native"
+CXXFLAGS="${CFLAGS}"
+MAKEOPTS="-j4"
+GENTOO_MIRRORS="https://mirror.dkm.cz/gentoo/"
+
+## unnecessary and powerless inside proot
+USE="-caps -filecaps -suid"
+EOF
+	cat > env/rootcompile << EOF
+FEATURES="${FEATURES} -sandbox -usersandbox -userpriv"
+EOF
+	cat > profile/packages << EOF
+## unnecessary and pointless in a chroot
+-*virtual/dev-manager
+-*virtual/udev
+-*virtual/service-manager
+-*virtual/modutils
+
+## ???
+-*virtual/pam
+EOF
+	cat > package.env/termux << EOF
+dev-lang/python rootcompile
+EOF
+	cat > package.use/termux << EOF
+## won't compile otherwise
+sys-libs/glibc suid
+EOF
+	echo "You'll probably need root and to mount /dev/shm"
+	echo "as tmpfs and chmod it to 1777 to compile Python (or to just crosscompile it?)"
+	echo "Haven't tested all packages myself, naturally"
+	echo "Also, tweak the MAKEOPTS in make.conf if you want, I guess"
+	echo "The package.env for dev-lang/python may or may not be unnecessary"
+	)
+fi
 
 ## entry script
 cd
