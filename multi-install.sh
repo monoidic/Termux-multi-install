@@ -140,41 +140,43 @@ if [ $install = alpine ]; then
 	sumurl="${tarurl}.sha512"
 	sum="sha512sum"
 elif [ $install = fedora ]; then
-	[ $arch = x86 ] && { echo "No x86 fedora image available"; exit 1; }
-	[ $arch = armhf ] && arch=armhfp
-	[ $arch = aarch64 ] && secdir="-secondary"
+	if [ $arch = x86 ]; then echo "No x86 fedora image available"; exit 1
+	elif [ $arch = armhf ]; then arch=armhfp
+	elif [ $arch = aarch64 ]; thensecdir="-secondary"
+	fi
 	baseurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker"
 	tarurl="${baseurl}-Base-${release}-${secondaryopt}.${arch}.tar.xz"
 	sumurl="${baseurl}-${release}-${secondaryopt}-${arch}-CHECKSUM"
 	sum="sha256sum"
 elif [ $install = gentoo ]; then
-	[ $arch = aarch64 ] && tarurl="https://gentoo.osuosl.org/experimental/arm64/stage3-arm64-20180305.tar.bz2"
-	[ $arch = armhf ] && { arch=arm; secdir="armv7a_hardfp"; }
-	[ $arch = x86_64 ] && { arch=amd64; secdir=amd64; }
-	[ $arch = x86 ] && secdir=i686
-	[ -z $tarurl ] && {
+	if [ $arch = aarch64 ]; then tarurl="https://gentoo.osuosl.org/experimental/arm64/stage3-arm64-20180305.tar.bz2"
+	elif [ $arch = armhf ]; then arch=arm; secdir="armv7a_hardfp"
+	elif [ $arch = x86_64 ]; then arch=amd64; secdir=amd64
+	elif [ $arch = x86 ]; then secdir=i686
+	fi
+	if [ -z $tarurl ]; then
 		baseurl="https://gentoo.osuosl.org/releases/${arch}/autobuilds/"
 		tarurl=$(curl "${baseurl}/latest-stage3-${secdir}.txt" | grep -o "^.*stage3-${secdir}-.*.tar.\w*")
 		tarurl="${baseurl}${tarurl}"
-	}
+	fi
 	sumurl="${tarurl}.DIGESTS"
 elif [ $install = slackware ]; then
-	[[ $arch =~ x86 ]] && { echo "No x86(_64) slackware image available"; exit 1; }
-	[ $arch = armhf ] && {
+	if [[ $arch =~ x86 ]]; then echo "No x86(_64) slackware image available"; exit 1
+	elif [ $arch = armhf ]; then
 		baseurl"https://ftp.slackware.pl/pub/slackwarearm/slackwarearm-devtools/minirootfs/roots/slack-current-miniroot"
 		tarurl="${baseurl}_12Apr18.tar.xz"
 		sumurl="${baseurl}_details.txt"
-	}
-	[ $arch = aarch64 ] && {
+	elif [ $arch = aarch64 ]; then
 		baseurl="http://dl.fail.pp.ua/slackware/minirootfs/slack-current-aarch64-miniroot"
 		tarurl="${baseurl}_14Apr18.tar.xz"
 		sumurl="${baseurl}_14Apr18_details.txt"
-	}
+	fi
 	sum="sha1sum"
 elif [ $install = ubuntu ]; then
-	[ $arch = aarch64 ] && arch=arm64
-	[ $arch = x86 ] && arch=i386
-	[ $arch = x86_64 ] && arch=amd64
+	if [ $arch = aarch64 ]; then arch=arm64
+	elif [ $arch = x86 ]; then arch=i386
+	elif [ $arch = x86_64 ];then arch=amd64
+	fi
 	baseurl="https://partner-images.canonical.com/core/${release}/current"
 	tarurl="${baseurl}/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
 	sumurl="${baseurl}/SHA256SUMS"
