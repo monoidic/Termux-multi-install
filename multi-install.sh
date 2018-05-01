@@ -99,8 +99,12 @@ while true; do
 	esac
 done
 
-echo -e "Select a release:\n${releases}"
-read _release
+if [ -z "$2" ]; then
+	echo -e "Select a release:\n${releases}"
+	read _release
+else
+	_release="$2"
+fi
 
 if [ $install = alpine ]; then case "$_release" in
 		[Ee]*) release="edge" ;;
@@ -160,6 +164,9 @@ elif [ $install = gentoo ]; then
 		tarurl="${baseurl}${tarurl}"
 	fi
 	sumurl="${tarurl}.DIGESTS"
+#	sum="sha512sum"
+	sum=":"
+	## TODO: make it actually work?
 elif [ $install = slackware ]; then
 	if [[ $arch =~ x86 ]]; then echo "No x86(_64) slackware image available"; exit 1
 	elif [ $arch = armhf ]; then
