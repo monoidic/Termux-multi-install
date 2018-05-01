@@ -45,15 +45,13 @@ chkpak() {
 
 cd
 
-_arch=`getprop ro.product.cpu.abi`
-
 case "`getprop ro.product.cpu.abi`" in
 	arm64-v8a) arch=aarch64	;;
 	armeabi*) arch=armhf ;;
 	x86_64) arch=x86_64 ;;
 	x86) arch=x86 ;;
 	*)
-		printf 'Unknown arch "%s", exiting\n' "$_arch"
+		printf 'Unknown arch "%s", exiting\n' "`getprop ro.product.cpu.abi`"
 		exit 1
 		;;
 esac
