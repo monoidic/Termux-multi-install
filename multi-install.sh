@@ -102,22 +102,23 @@ done
 echo -e "Select a release:\n${releases}"
 read _release
 
-[ $install = alpine ] && case "$_release" in
-	[Ee]*) release="edge" ;;
-	*3*|*7*|*) release="v3.7" ;;
-esac
-[ $install = fedora ] && case "$_release" in
-	*7*) release="27"; secondaryopt="1.6" ;;
-	*6*|*) release="26"; secondaryopt="1.5" ;;
-esac
-[ $install = gentoo ] && release="current"
-[ $install = slackware ] && release="current"
-[ $install = ubuntu ] && case "$_release" in
-	*14*|[Tt]*) release="trusty" ;;
-	*16*|[Xx]*) release="xenial" ;;
-	*18*|[Bb]*) release="bionic" ;;
-	*17*|[Aa]*|*) release="artful" ;;
-esac
+if [ $install = alpine ]; then case "$_release" in
+		[Ee]*) release="edge" ;;
+		*3*|*7*|*) release="v3.7" ;;
+	esac
+elif [ $install = fedora ]; then case "$_release" in
+		*7*) release="27"; secondaryopt="1.6" ;;
+		*6*|*) release="26"; secondaryopt="1.5" ;;
+	esac
+elif [ $install = gentoo ]; then release="current"
+elif [ $install = slackware ]; then release="current"
+elif [ $install = ubuntu ]; then case "$_release" in
+		*14*|[Tt]*) release="trusty" ;;
+		*16*|[Xx]*) release="xenial" ;;
+		*18*|[Bb]*) release="bionic" ;;
+		*17*|[Aa]*|*) release="artful" ;;
+	esac
+fi
 
 prefixdir="prefixes/${install}-${release}"
 
@@ -151,7 +152,7 @@ elif [ $install = gentoo ]; then
 	[ $arch = armhf ] && { arch=arm; secdir="armv7a_hardfp"; }
 	[ $arch = x86_64 ] && { arch=amd64; secdir=amd64; }
 	[ $arch = x86 ] && secdir=i686
-	[ -z $tarurl ] {
+	[ -z $tarurl ] && {
 		baseurl="https://gentoo.osuosl.org/releases/${arch}/autobuilds/"
 		tarurl=$(curl "${baseurl}/latest-stage3-${secdir}.txt" | grep -o "^.*stage3-${secdir}-.*.tar.\w*")
 		tarurl="${baseurl}${tarurl}"
