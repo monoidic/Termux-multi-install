@@ -1,7 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/env bash
 
-## Written by revel, all rites reversed, five tons of flax, yadda yadda yadda
+## Written by revel/monoidic, all rites reversed, five tons of flax, yadda yadda yadda
 ## May or may not be heavily based on other such scripts
+## May contain outdated links
 
 #set -x
 set -e
