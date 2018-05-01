@@ -57,7 +57,7 @@ case "`getprop ro.product.cpu.abi`" in
 		;;
 esac
 
-chkpak proot wget tar coreutils grep
+chkpak proot wget tar coreutils grep curl
 
 
 
