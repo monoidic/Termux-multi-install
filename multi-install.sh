@@ -142,7 +142,7 @@ if [ $install = alpine ]; then
 elif [ $install = fedora ]; then
 	if [ $arch = x86 ]; then echo "No x86 fedora image available"; exit 1
 	elif [ $arch = armhf ]; then arch=armhfp
-	elif [ $arch = aarch64 ]; thensecdir="-secondary"
+	elif [ $arch = aarch64 ]; then secdir="-secondary"
 	fi
 	baseurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker"
 	tarurl="${baseurl}-Base-${release}-${secondaryopt}.${arch}.tar.xz"
