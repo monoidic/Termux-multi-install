@@ -240,9 +240,6 @@ EOF
 -*virtual/udev
 -*virtual/service-manager
 -*virtual/modutils
-
-## ???
--*virtual/pam
 EOF
 	cat > package.env/termux << EOF
 dev-lang/python rootcompile
