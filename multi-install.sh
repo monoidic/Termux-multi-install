@@ -201,7 +201,7 @@ $sum --ignore-missing --check checksum || error "Checksum error"
 tarfile=*.tar.*
 echo -e "\nExtracting prefix..."
 if [ $install = fedora ]; then
-	tar xf $tarfile --strip-components=1 --exclude json --exclude VERSION | tar xp
+	tar xf $tarfile --strip-components=1 --exclude json --exclude VERSION -O | tar xp
 	chmod +w .
 else
 	proot --link2symlink -0 tar xpf $tarfile 2> /dev/null || :
