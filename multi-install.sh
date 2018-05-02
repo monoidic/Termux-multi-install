@@ -204,7 +204,8 @@ if [ $install = fedora ]; then
 	tar xf $tarfile --strip-components=1 --exclude json --exclude VERSION -O | tar xp
 	chmod +w .
 else
-	proot --link2symlink -0 tar xpf $tarfile --exclude dev 2> /dev/null || :
+#	proot --link2symlink -0 tar xpf $tarfile 2> /dev/null || :
+	tar xpf $tarfile --exclude dev || :
 	mkdir -p dev
 fi
 
@@ -280,7 +281,8 @@ cat > "$script" << EOF
 #!/bin/bash
 
 unset LD_PRELOAD
-exec proot --link2symlink \
+#--link2symlink
+exec proot \
 \$([ -z \$@ ] && echo "-0") \
 -r $(realpath "$prefixdir") \
 -b $HOME -b /dev -b /proc -b /storage -b /sys -w / \
