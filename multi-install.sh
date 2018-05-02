@@ -204,7 +204,8 @@ if [ $install = fedora ]; then
 	tar xf $tarfile --strip-components=1 --exclude json --exclude VERSION -O | tar xp
 	chmod +w .
 else
-	proot --link2symlink -0 tar xpf $tarfile 2> /dev/null || :
+	proot --link2symlink -0 tar xpf $tarfile --exclude dev 2> /dev/null || :
+	mkdir -p dev
 fi
 
 ## cleanup
