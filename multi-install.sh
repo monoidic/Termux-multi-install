@@ -4,6 +4,8 @@
 ## May or may not be heavily based on other such scripts
 ## May contain outdated links
 
+## TODO: there's so many exceptions... Do something about that
+
 #set -x
 set -e
 
@@ -164,9 +166,7 @@ elif [ $install = gentoo ]; then
 		tarurl="${baseurl}${tarurl}"
 	fi
 	sumurl="${tarurl}.DIGESTS"
-#	sum="sha512sum"
-	sum=":"
-	## TODO: make it actually work?
+	sum="sha512sum"
 elif [ $install = slackware ]; then
 	if [[ $arch =~ x86 ]]; then echo "No x86(_64) slackware image available"; exit 1
 	elif [ $arch = armhf ]; then
@@ -191,6 +191,11 @@ elif [ $install = ubuntu ]; then
 fi
 
 wget $tarurl && wget $sumurl -O checksum || error "Error fetching files"
+
+if [ $install = gentoo ]; then
+	sed -i 2q checksum
+	sed -i s/-2008.0.t/-20180305.t/ checksum
+fi
 
 $sum --ignore-missing --check checksum || error "Checksum error"
 tarfile=*.tar.*
@@ -231,7 +236,7 @@ if [ $install = gentoo ]; then
 	(
 	cd etc/portage
 	mkdir -p env package.env package.use profile
-	cat >> make.conf < EOF
+	cat >> make.conf << EOF
 CFLAGS="-O2 -pipe -march=native"
 CXXFLAGS="${CFLAGS}"
 MAKEOPTS="-j4"
