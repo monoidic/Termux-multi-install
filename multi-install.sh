@@ -269,11 +269,11 @@ sys-apps/iproute2 -iptables
 ## useless in proot
 sys-apps/debianutils -installkernel
 EOF
-	echo "You'll probably need root and to mount /dev/shm"
-	echo "as tmpfs and chmod it to 1777 to compile Python (or to just crosscompile it?)"
-	echo "Haven't tested all packages myself, naturally"
-	echo "Also, tweak the MAKEOPTS in make.conf if you want, I guess"
-	echo "The package.env for dev-lang/python may or may not be unnecessary"
+	cat << EOM
+You'll probably need root and to mount /dev/shm
+as tmpfs and chmod it to 1777 to have *everything* work properly...
+Also, tweak the MAKEOPTS in make.conf if you want, I guess
+The package.env for dev-lang/python may or may not be unnecessary
 	)
 fi
 
