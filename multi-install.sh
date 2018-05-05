@@ -274,6 +274,7 @@ You'll probably need root and to mount /dev/shm
 as tmpfs and chmod it to 1777 to have *everything* work properly...
 Also, tweak the MAKEOPTS in make.conf if you want, I guess
 The package.env for dev-lang/python may or may not be unnecessary
+EOM
 	)
 fi
 
