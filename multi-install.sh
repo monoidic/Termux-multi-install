@@ -240,22 +240,23 @@ if [ $install = gentoo ]; then
 	mkdir -p env package.env package.use profile
 	cat >> make.conf << EOF
 CFLAGS="-O2 -pipe -march=native"
-CXXFLAGS="${CFLAGS}"
+CXXFLAGS="\${CFLAGS}"
 MAKEOPTS="-j4"
 GENTOO_MIRRORS="https://mirror.dkm.cz/gentoo/"
 
 ## unnecessary and powerless inside proot
-USE="-caps -filecaps -suid"
+USE="\${USE} -caps -filecaps -suid"
 EOF
 	cat > env/rootcompile << EOF
-FEATURES="${FEATURES} -sandbox -usersandbox -userpriv"
+FEATURES="\${FEATURES} -sandbox -usersandbox -userpriv"
 EOF
 	cat > profile/packages << EOF
-## unnecessary and pointless in a chroot
+## unnecessary and pointless in proot
 -*virtual/dev-manager
 -*virtual/udev
 -*virtual/service-manager
 -*virtual/modutils
+-*sys-fs/e2fsprogs
 EOF
 	cat > package.env/termux << EOF
 dev-lang/python rootcompile
@@ -263,6 +264,10 @@ EOF
 	cat > package.use/termux << EOF
 ## won't compile otherwise
 sys-libs/glibc suid
+## use an external iptables if you're rooted, please
+sys-apps/iproute2 -iptables
+## useless in proot
+sys-apps/debianutils -installkernel
 EOF
 	echo "You'll probably need root and to mount /dev/shm"
 	echo "as tmpfs and chmod it to 1777 to compile Python (or to just crosscompile it?)"
