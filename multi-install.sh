@@ -9,7 +9,7 @@
 #set -x
 set -e
 
-availabledists="alpine, fedora, gentoo, slackware, ubuntu"
+availabledists="alpine, arch, fedora, gentoo, slackware, ubuntu"
 ## tested and didn't work very well: debian (debootstrap and experimental rootfs)
 
 error() {
@@ -58,7 +58,7 @@ case "`getprop ro.product.cpu.abi`" in
 		;;
 esac
 
-chkpak proot wget tar coreutils grep curl
+chkpak proot wget tar bsdtar coreutils grep curl
 
 
 
@@ -79,8 +79,11 @@ fi
 
 while true; do
 	case "$selection" in
-		[Aa]*) install=alpine
+		[Aa][Ll]*) install=alpine
 			releases="[3.7], edge"
+			break ;;
+		[Aa][Rr]*) install=arch
+			releases="[current]"
 			break ;;
 		[Ff]*) install=fedora
 			releases="[26], 27"
@@ -112,6 +115,7 @@ if [ $install = alpine ]; then case "$_release" in
 		[Ee]*) release="edge" ;;
 		*3*|*7*|*) release="v3.7" ;;
 	esac
+elif [ $install = arch ]; then release="current"
 elif [ $install = fedora ]; then case "$_release" in
 		*7*) release="27"; secondaryopt="1.6" ;;
 		*6*|*) release="26"; secondaryopt="1.5" ;;
@@ -145,6 +149,13 @@ if [ $install = alpine ]; then
 	tarurl="https://nl.alpinelinux.org/alpine/${release}/releases/${arch}/alpine-minirootfs-3.7.0-${arch}.tar.gz"
 	sumurl="${tarurl}.sha512"
 	sum="sha512sum"
+elif [ $install = arch ]; then
+	if [ $arch = armhf ]; then arch=armv7
+	elif [[ $arch =~ x86 ]]; then { echo "idk, arch mirrors don't have any easy-to-keep-track-of way of marking mirrors for you"; exit 1; }
+	fi
+	tarurl="https://mirror.dotsrc.org/archlinuxarm/os/ArchLinuxARM-${arch}-latest.tar.gz"
+	sumurl="${tarurl}.md5"
+	sum="md5sum"
 elif [ $install = fedora ]; then
 	if [ $arch = x86 ]; then echo "No x86 fedora image available"; exit 1
 	elif [ $arch = armhf ]; then arch=armhfp
@@ -201,16 +212,16 @@ $sum --ignore-missing --check checksum || error "Checksum error"
 tarfile=*.tar.*
 echo -e "\nExtracting prefix..."
 if [ $install = fedora ]; then
-	tar xf $tarfile --strip-components=1 --exclude json --exclude VERSION -O | tar xp
+	tar xf $tarfile --strip-components=1 layer.tar -O | tar xp
 	chmod +w .
 else
 #	proot --link2symlink -0 tar xpf $tarfile 2> /dev/null || :
-	tar xpf $tarfile --exclude dev || :
+	proot -0 bsdtar -xpf $tarfile --exclude dev || :
 	mkdir -p dev
 fi
 
 ## cleanup
-rm $tarfile checksum
+rm -f $tarfile checksum
 
 ## touchups
 echo "Adding users/groups/DNS..."
@@ -229,6 +240,7 @@ cat >> etc/passwd << EOF
 user:x:${userid}:${userid}::/home:/bin/sh
 EOF
 
+rm -f etc/resolv.conf
 cat > etc/resolv.conf << EOF
 nameserver 1.1.1.1
 nameserver 1.0.0.1
