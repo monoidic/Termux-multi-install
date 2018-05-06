@@ -41,28 +41,20 @@ chkpak() {
 	echo
 }
 
+getarch() {
+	case "`getprop ro.product.cpu.abi`" in
+		arm64-v8a) arch=aarch64	;;
+		armeabi*) arch=armhf ;;
+		x86_64) arch=x86_64 ;;
+		x86) arch=x86 ;;
+		*)
+			printf 'Unknown arch "%s", exiting\n' "`getprop ro.product.cpu.abi`"
+			exit 1
+			;;
+	esac
+}
 
-
-
-
-cd
-
-case "`getprop ro.product.cpu.abi`" in
-	arm64-v8a) arch=aarch64	;;
-	armeabi*) arch=armhf ;;
-	x86_64) arch=x86_64 ;;
-	x86) arch=x86 ;;
-	*)
-		printf 'Unknown arch "%s", exiting\n' "`getprop ro.product.cpu.abi`"
-		exit 1
-		;;
-esac
-
-chkpak proot wget tar bsdtar coreutils grep curl
-
-
-
-if [ -z "$1" ]; then
+printusage() {
 	cat <<- EOM
 		Welcome to the Termux prefix multi-installer
 		This tool will save the prefixes in ~/prefixes
@@ -72,13 +64,10 @@ if [ -z "$1" ]; then
 		Available prefixes:
 		$availabledists
 	EOM
-	read selection
-else
-	selection="$1"
-fi
+}
 
-while true; do
-	case "$selection" in
+distroselect() {
+	while true; do case "$selection" in
 		[Aa][Ll]*) install=alpine
 			releases="[3.7], edge"
 			break ;;
@@ -104,43 +93,35 @@ while true; do
 		*)
 			echo "Not available (enter q to exit)"
 			read selection ;;
-	esac
-done
+	esac; done
+}
 
-if [ $releases = "[current]" ]; then :
-elif [ -z "$2" ]; then
-	echo -e "Select a release:\n${releases}"
-	read _release
-else
-	_release="$2"
-fi
+releaseselect() {
+	if [ $install = alpine ]; then case "$_release" in
+			[Ee]*) release="edge" ;;
+			*3*|*7*|*) release="v3.7" ;;
+		esac
+	elif [ $install = arch ]; then release="current"
+	elif [ $install = fedora ]; then case "$_release" in
+			*7*) release="27"; secondaryopt="1.6" ;;
+			*6*|*) release="26"; secondaryopt="1.5" ;;
+		esac
+	elif [ $install = gentoo ]; then release="current"
+	elif [ $install = slackware ]; then release="current"
+	elif [ $install = ubuntu ]; then case "$_release" in
+			*14*|[Tt]*) release="trusty" ;;
+			*16*|[Xx]*) release="xenial" ;;
+			*18*|[Bb]*) release="bionic" ;;
+			*17*|[Aa]*|*) release="artful" ;;
+		esac
+	elif [ $install = void ]; then case "$_release" in
+			[Gg]*) release="glibc" ;;
+			*) release="musl" ;;
+		esac
+	fi
+}
 
-if [ $install = alpine ]; then case "$_release" in
-		[Ee]*) release="edge" ;;
-		*3*|*7*|*) release="v3.7" ;;
-	esac
-elif [ $install = arch ]; then release="current"
-elif [ $install = fedora ]; then case "$_release" in
-		*7*) release="27"; secondaryopt="1.6" ;;
-		*6*|*) release="26"; secondaryopt="1.5" ;;
-	esac
-elif [ $install = gentoo ]; then release="current"
-elif [ $install = slackware ]; then release="current"
-elif [ $install = ubuntu ]; then case "$_release" in
-		*14*|[Tt]*) release="trusty" ;;
-		*16*|[Xx]*) release="xenial" ;;
-		*18*|[Bb]*) release="bionic" ;;
-		*17*|[Aa]*|*) release="artful" ;;
-	esac
-elif [ $install = void ]; then case "$_release" in
-		[Gg]*) release="glibc" ;;
-		*) release="musl" ;;
-	esac
-fi
-
-prefixdir="prefixes/${install}-${release}"
-
-if [ -d "$prefixdir" ]; then
+prefixexists() {
 	echo "This prefix already exists. Would you like to remove it first?"
 	echo -en "(no will attempt to overwrite it in-place)\n(Yn)"
 	read rmprefix
@@ -148,104 +129,100 @@ if [ -d "$prefixdir" ]; then
 		[Nn]*) : ;;
 		[Yy]*|*) chmod -R 777 "$prefixdir"; rm -rf "$prefixdir" ;;
 	esac
-fi
-mkdir -p "$prefixdir"
-cd "$prefixdir"
-echo "Downloading archive and checksums..."
+}
 
-if [ $install = alpine ]; then
-	tarurl="https://nl.alpinelinux.org/alpine/${release}/releases/${arch}/alpine-minirootfs-3.7.0-${arch}.tar.gz"
-	sumurl="${tarurl}.sha512"
-	sum="sha512sum"
-elif [ $install = arch ]; then
-	if [ $arch = armhf ]; then arch=armv7
-	elif [[ $arch =~ x86 ]]; then { echo "idk, arch mirrors don't have any easy-to-keep-track-of way of marking mirrors for you"; exit 1; }
+dldata() {
+	if [ $install = alpine ]; then
+		tarurl="https://nl.alpinelinux.org/alpine/${release}/releases/${arch}/alpine-minirootfs-3.7.0-${arch}.tar.gz"
+		sumurl="${tarurl}.sha512"
+		sum="sha512sum"
+	elif [ $install = arch ]; then
+		if [ $arch = armhf ]; then arch=armv7
+		elif [[ $arch =~ x86 ]]; then error "idk, arch mirrors don't have any easy-to-keep-track-of way of marking mirrors for you"
+		fi
+		tarurl="https://mirror.dotsrc.org/archlinuxarm/os/ArchLinuxARM-${arch}-latest.tar.gz"
+		sumurl="${tarurl}.md5"
+		sum="md5sum"
+	elif [ $install = fedora ]; then
+		if [ $arch = x86 ]; then echo "No x86 fedora image available"; exit 1
+		elif [ $arch = armhf ]; then arch=armhfp
+		elif [ $arch = aarch64 ]; then secdir="-secondary"
+		fi
+		baseurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker"
+		tarurl="${baseurl}-Base-${release}-${secondaryopt}.${arch}.tar.xz"
+		sumurl="${baseurl}-${release}-${secondaryopt}-${arch}-CHECKSUM"
+		sum="sha256sum"
+	elif [ $install = gentoo ]; then
+		if [ $arch = aarch64 ]; then tarurl="https://gentoo.osuosl.org/experimental/arm64/stage3-arm64-20180305.tar.bz2"
+		elif [ $arch = armhf ]; then arch=arm; secdir="armv7a_hardfp"
+		elif [ $arch = x86_64 ]; then arch=amd64; secdir=amd64
+		elif [ $arch = x86 ]; then secdir=i686
+		fi
+		if [ -z $tarurl ]; then
+			baseurl="https://gentoo.osuosl.org/releases/${arch}/autobuilds/"
+			tarurl=$(curl "${baseurl}/latest-stage3-${secdir}.txt" | grep -o "^.*stage3-${secdir}-.*.tar.\w*")
+			tarurl="${baseurl}${tarurl}"
+		fi
+		sumurl="${tarurl}.DIGESTS"
+		sum="sha512sum"
+	elif [ $install = slackware ]; then
+		if [[ $arch =~ x86 ]]; then error "No x86(_64) slackware image available"
+		elif [ $arch = armhf ]; then
+			baseurl"https://ftp.slackware.pl/pub/slackwarearm/slackwarearm-devtools/minirootfs/roots/slack-current-miniroot"
+			tarurl="${baseurl}_12Apr18.tar.xz"
+			sumurl="${baseurl}_details.txt"
+		elif [ $arch = aarch64 ]; then
+			baseurl="http://dl.fail.pp.ua/slackware/minirootfs/slack-current-aarch64-miniroot"
+			tarurl="${baseurl}_14Apr18.tar.xz"
+			sumurl="${baseurl}_14Apr18_details.txt"
+		fi
+		sum="sha1sum"
+	elif [ $install = ubuntu ]; then
+		if [ $arch = aarch64 ]; then arch=arm64
+		elif [ $arch = x86 ]; then arch=i386
+		elif [ $arch = x86_64 ];then arch=amd64
+		fi
+		baseurl="https://partner-images.canonical.com/core/${release}/current"
+		tarurl="${baseurl}/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
+		sumurl="${baseurl}/SHA256SUMS"
+		sum="sha256sum"
+	elif [ $install = void ]; then
+		if [ $arch = x86 ]; then error "No rootfs for this arch available"
+		elif [ $arch = armhf ]; then arch=armv7l
+		fi
+		[ $release = musl ] && musl="-musl"
+		baseurl="https://mirror.clarkson.edu/voidlinux/live/current"
+		tarurl="${baseurl}/void-${arch}${musl}-ROOTFS-20171007.tar.xz"
+		sumurl="${baseurl}/sha256sums.txt"
+		sum="sha256sum"
 	fi
-	tarurl="https://mirror.dotsrc.org/archlinuxarm/os/ArchLinuxARM-${arch}-latest.tar.gz"
-	sumurl="${tarurl}.md5"
-	sum="md5sum"
-elif [ $install = fedora ]; then
-	if [ $arch = x86 ]; then echo "No x86 fedora image available"; exit 1
-	elif [ $arch = armhf ]; then arch=armhfp
-	elif [ $arch = aarch64 ]; then secdir="-secondary"
-	fi
-	baseurl="https://download.fedoraproject.org/pub/fedora${secdir}/releases/${release}/Docker/${arch}/images/Fedora-Docker"
-	tarurl="${baseurl}-Base-${release}-${secondaryopt}.${arch}.tar.xz"
-	sumurl="${baseurl}-${release}-${secondaryopt}-${arch}-CHECKSUM"
-	sum="sha256sum"
-elif [ $install = gentoo ]; then
-	if [ $arch = aarch64 ]; then tarurl="https://gentoo.osuosl.org/experimental/arm64/stage3-arm64-20180305.tar.bz2"
-	elif [ $arch = armhf ]; then arch=arm; secdir="armv7a_hardfp"
-	elif [ $arch = x86_64 ]; then arch=amd64; secdir=amd64
-	elif [ $arch = x86 ]; then secdir=i686
-	fi
-	if [ -z $tarurl ]; then
-		baseurl="https://gentoo.osuosl.org/releases/${arch}/autobuilds/"
-		tarurl=$(curl "${baseurl}/latest-stage3-${secdir}.txt" | grep -o "^.*stage3-${secdir}-.*.tar.\w*")
-		tarurl="${baseurl}${tarurl}"
-	fi
-	sumurl="${tarurl}.DIGESTS"
-	sum="sha512sum"
-elif [ $install = slackware ]; then
-	if [[ $arch =~ x86 ]]; then echo "No x86(_64) slackware image available"; exit 1
-	elif [ $arch = armhf ]; then
-		baseurl"https://ftp.slackware.pl/pub/slackwarearm/slackwarearm-devtools/minirootfs/roots/slack-current-miniroot"
-		tarurl="${baseurl}_12Apr18.tar.xz"
-		sumurl="${baseurl}_details.txt"
-	elif [ $arch = aarch64 ]; then
-		baseurl="http://dl.fail.pp.ua/slackware/minirootfs/slack-current-aarch64-miniroot"
-		tarurl="${baseurl}_14Apr18.tar.xz"
-		sumurl="${baseurl}_14Apr18_details.txt"
-	fi
-	sum="sha1sum"
-elif [ $install = ubuntu ]; then
-	if [ $arch = aarch64 ]; then arch=arm64
-	elif [ $arch = x86 ]; then arch=i386
-	elif [ $arch = x86_64 ];then arch=amd64
-	fi
-	baseurl="https://partner-images.canonical.com/core/${release}/current"
-	tarurl="${baseurl}/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
-	sumurl="${baseurl}/SHA256SUMS"
-	sum="sha256sum"
-elif [ $install = void ]; then
-	if [ $arch = armhf ]; then arch=armv7l
-	elif [ $arch = x86 ]; then { echo "No rootfs for this arch available"; exit 1; }
-	fi
-	[ $release = musl ] && musl="-musl"
-	baseurl="https://mirror.clarkson.edu/voidlinux/live/current"
-	tarurl="${baseurl}/void-${arch}${musl}-ROOTFS-20171007.tar.xz"
-	sumurl="${baseurl}/sha256sums.txt"
-	sum="sha256sum"
-fi
+}
 
-wget $tarurl && wget $sumurl -O checksum || error "Error fetching files"
-
-if [ $install = gentoo ]; then
+gentoosumfix() {
 	sed -i 2q checksum
 	sed -i s/-2008.0.t/-20180305.t/ checksum
-fi
+}
 
-$sum --ignore-missing --check checksum || error "Checksum error"
-tarfile=*.tar.*
-echo -e "\nExtracting prefix..."
-if [ $install = fedora ]; then
+fedoraextract() {
 	tar xf $tarfile --strip-components=1 layer.tar -O | tar xp
 	chmod +w .
-else
+}
+
+regularextract() {
 #	proot --link2symlink -0 tar xpf $tarfile 2> /dev/null || :
 	proot -0 bsdtar -xpf $tarfile --exclude dev || :
 	mkdir -p dev
-fi
+}
 
-## cleanup
-rm -f $tarfile checksum
+cleanup() {
+	rm -f $tarfile checksum
+}
 
-## touchups
-echo "Adding users/groups/DNS..."
-username=$(id -un)
-userid=$(id -u)
+touchups() {
+	username=$(id -un)
+	userid=$(id -u)
 
-cat >> etc/group <<- EOF
+	cat >> etc/group <<- EOF
 ident:x:3003:
 everybody:x:9997:
 ${username}_cache:x:$((userid + 10000)):
@@ -253,17 +230,18 @@ all_a$((userid - 10000)):x:$((userid + 40000)):
 user:x:${userid}:
 EOF
 
-cat >> etc/passwd << EOF
+	cat >> etc/passwd << EOF
 user:x:${userid}:${userid}::/home:/bin/sh
 EOF
 
-rm -f etc/resolv.conf
-cat > etc/resolv.conf << EOF
+	rm -f etc/resolv.conf
+	cat > etc/resolv.conf << EOF
 nameserver 1.1.1.1
 nameserver 1.0.0.1
 EOF
+}
 
-if [ $install = gentoo ]; then
+gentootouchups() {
 	(
 	cd etc/portage
 	mkdir -p env package.env package.use profile
@@ -305,14 +283,13 @@ Also, tweak the MAKEOPTS in make.conf if you want, I guess
 The package.env for dev-lang/python may or may not be unnecessary
 EOM
 	)
-fi
+}
 
-## entry script
-cd
-echo "Creating entry script in ~/bin"
-mkdir -p bin
-script="bin/start-${install}-${release}"
-cat > "$script" << EOF
+entryscript() {
+	echo "Creating entry script in ~/bin"
+	mkdir -p bin
+	script="bin/start-${install}-${release}"
+	cat > "$script" << EOF
 #!/bin/bash
 
 unset LD_PRELOAD
@@ -327,6 +304,75 @@ $([ $install = alpine ] && echo /bin/sh || echo /bin/bash) \
 --login
 EOF
 
-termux-fix-shebang "$script"
-chmod +x "$script"
+	termux-fix-shebang "$script"
+	chmod +x "$script"
+}
+
+
+
+cd
+chkpak proot wget tar bsdtar coreutils grep curl
+getarch
+
+
+if [ "$1" ]; then
+	selection="$1"
+else
+	printusage
+	read selection
+fi
+
+distroselect
+
+if [ $releases = "[current]" ]; then :
+elif [ "$2" ]; then
+	_release="$2"
+else
+	echo -e "Select a release:\n${releases}"
+	read _release
+fi
+
+releaseselect
+
+
+prefixdir="prefixes/${install}-${release}"
+
+if [ -d "$prefixdir" ]; then
+	prefixexists
+fi
+
+
+mkdir -p "$prefixdir"
+cd "$prefixdir"
+echo "Downloading archive and checksums..."
+
+
+dldata
+
+
+wget $tarurl && wget $sumurl -O checksum || error "Error fetching files"
+
+[ $install = gentoo ] && gentoosumfix
+
+$sum --ignore-missing --check checksum || error "Checksum error"
+tarfile=*.tar.*
+
+echo -e "\nExtracting prefix..."
+
+if [ $install = fedora ]; then
+	fedoraextract
+else
+	regularextract
+fi
+
+cleanup
+
+echo "Adding users/groups/DNS..."
+touchups
+
+[ $install = gentoo ] && gentootouchups
+
+cd
+entryscript
+
 echo "Done! Execute ~/$script to enter the prefix"
