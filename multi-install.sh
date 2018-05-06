@@ -9,7 +9,7 @@
 #set -x
 set -e
 
-availabledists="alpine, arch, fedora, gentoo, slackware, ubuntu"
+availabledists="alpine, arch, fedora, gentoo, slackware, ubuntu, void"
 ## tested and didn't work very well: debian (debootstrap and experimental rootfs)
 
 error() {
@@ -97,6 +97,9 @@ while true; do
 		[Uu]*) install=ubuntu
 			releases="trusty(14.04), xenial(16.04), [artful(17.10)], bionic(18.04)"
 			break ;;
+		[Vv]*) install=void
+			releases="[musl], glibc"
+			break ;;
 		[Qq]*) exit ;;
 		*)
 			echo "Not available (enter q to exit)"
@@ -104,7 +107,8 @@ while true; do
 	esac
 done
 
-if [ -z "$2" ]; then
+if [ $releases = "[current]" ]; then :
+elif [ -z "$2" ]; then
 	echo -e "Select a release:\n${releases}"
 	read _release
 else
@@ -127,6 +131,10 @@ elif [ $install = ubuntu ]; then case "$_release" in
 		*16*|[Xx]*) release="xenial" ;;
 		*18*|[Bb]*) release="bionic" ;;
 		*17*|[Aa]*|*) release="artful" ;;
+	esac
+elif [ $install = void ]; then case "$_release" in
+		[Gg]*) release="glibc" ;;
+		*) release="musl" ;;
 	esac
 fi
 
@@ -198,6 +206,15 @@ elif [ $install = ubuntu ]; then
 	baseurl="https://partner-images.canonical.com/core/${release}/current"
 	tarurl="${baseurl}/ubuntu-${release}-core-cloudimg-${arch}-root.tar.gz"
 	sumurl="${baseurl}/SHA256SUMS"
+	sum="sha256sum"
+elif [ $install = void ]; then
+	if [ $arch = armhf ]; then arch=armv7l
+	elif [ $arch = x86 ]; then { echo "No rootfs for this arch available"; exit 1; }
+	fi
+	[ $release = musl ] && musl="-musl"
+	baseurl="https://mirror.clarkson.edu/voidlinux/live/current"
+	tarurl="${baseurl}/void-${arch}${musl}-ROOTFS-20171007.tar.xz"
+	sumurl="${baseurl}/sha256sums.txt"
 	sum="sha256sum"
 fi
 
