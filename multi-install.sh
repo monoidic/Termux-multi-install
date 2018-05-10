@@ -6,6 +6,10 @@
 
 ## TODO: there's so many exceptions... Do something about that
 
+#https://nixos.org/nix/install
+#https://alpha.gnu.org/gnu/guix/guix-binary-0.14.0.aarch64-linux.tar.xz
+#https://mirror.leaseweb.com/devuan/devuan_ascii_beta/embedded/devuan_ascii_2.0.0-beta_arm64_raspi3.tar.gz
+
 #set -x
 set -e
 
@@ -31,10 +35,10 @@ chkpak() {
 	done
 	if [ -n "$notinstpak" ]; then
 		cat <<- EOM
-		Packages not installed:
-		$notinstpak
-		please install them using "dpkg install${notinstpak}"
-		and then try this script again.
+			Packages not installed:
+			$notinstpak
+			please install them using "dpkg install${notinstpak}"
+			and then try this script again.
 		EOM
 		exit 1
 	fi
@@ -223,65 +227,56 @@ touchups() {
 	userid=$(id -u)
 
 	cat >> etc/group <<- EOF
-ident:x:3003:
-everybody:x:9997:
-${username}_cache:x:$((userid + 10000)):
-all_a$((userid - 10000)):x:$((userid + 40000)):
-user:x:${userid}:
-EOF
-
-	cat >> etc/passwd << EOF
-user:x:${userid}:${userid}::/home:/bin/sh
-EOF
-
+		ident:x:3003:
+		everybody:x:9997:
+		${username}_cache:x:$((userid + 10000)):
+		all_a$((userid - 10000)):x:$((userid + 40000)):
+		user:x:${userid}:
+	EOF
+	cat >> etc/passwd <<- EOF
+		user:x:${userid}:${userid}::/home:/bin/sh
+	EOF
 	rm -f etc/resolv.conf
-	cat > etc/resolv.conf << EOF
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
+	cat > etc/resolv.conf <<- EOF
+		nameserver 1.1.1.1
+		nameserver 1.0.0.1
+	EOF
 }
 
 gentootouchups() {
 	(
 	cd etc/portage
 	mkdir -p env package.env package.use profile
-	cat >> make.conf << EOF
-CFLAGS="-O2 -pipe -march=native"
-CXXFLAGS="\${CFLAGS}"
-MAKEOPTS="-j4"
-GENTOO_MIRRORS="https://mirror.dkm.cz/gentoo/"
+	cat >> make.conf <<- EOF
+		CFLAGS="-O2 -pipe -march=native"
+		CXXFLAGS="\${CFLAGS}"
+		MAKEOPTS="-j4"
+		GENTOO_MIRRORS="https://mirror.dkm.cz/gentoo/"
 
-## unnecessary and powerless inside proot
-USE="\${USE} -caps -filecaps -suid"
-EOF
-	cat > env/rootcompile << EOF
-FEATURES="\${FEATURES} -sandbox -usersandbox -userpriv"
-EOF
-	cat > profile/packages << EOF
-## unnecessary and pointless in proot
--*virtual/dev-manager
--*virtual/udev
--*virtual/service-manager
--*virtual/modutils
--*sys-fs/e2fsprogs
-EOF
-	cat > package.env/termux << EOF
-dev-lang/python rootcompile
-EOF
-	cat > package.use/termux << EOF
-## won't compile otherwise
-sys-libs/glibc suid
-## use an external iptables if you're rooted, please
-sys-apps/iproute2 -iptables
-## useless in proot
-sys-apps/debianutils -installkernel
-EOF
-	cat << EOM
-You'll probably need root and to mount /dev/shm
-as tmpfs and chmod it to 1777 to have *everything* work properly...
-Also, tweak the MAKEOPTS in make.conf if you want, I guess
-The package.env for dev-lang/python may or may not be unnecessary
-EOM
+		## unnecessary and powerless inside proot
+		USE="\${USE} -caps -filecaps -suid"
+	EOF
+	cat > profile/packages <<- EOF
+		## unnecessary and pointless in proot
+		-*virtual/dev-manager
+		-*virtual/udev
+		-*virtual/service-manager
+		-*virtual/modutils
+		-*sys-fs/e2fsprogs
+	EOF
+	cat > package.use/termux <<- EOF
+		## won't compile otherwise
+		sys-libs/glibc suid
+		## use an external iptables if you're rooted, please
+		sys-apps/iproute2 -iptables
+		## useless in proot
+		sys-apps/debianutils -installkernel
+	EOF
+	cat <<- EOM
+		You'll probably need root and to mount /dev/shm
+		as tmpfs and chmod it to 1777 to have *everything* work properly...
+		Also, tweak the MAKEOPTS in make.conf if you want, I guess
+	EOM
 	)
 }
 
@@ -289,20 +284,20 @@ entryscript() {
 	echo "Creating entry script in ~/bin"
 	mkdir -p bin
 	script="bin/start-${install}-${release}"
-	cat > "$script" << EOF
-#!/bin/bash
+	cat > "$script" <<- EOF
+		#!/bin/bash
 
-unset LD_PRELOAD
-#--link2symlink
-exec proot \
-\$([ -z \$@ ] && echo "-0") \
--r $(realpath "$prefixdir") \
--b $HOME -b /dev -b /proc -b /storage -b /sys -w / \
-/usr/bin/env -i HOME=/root TERM=\$TERM LANG=en_US.UTF-8 \
-PATH=/bin:/usr/bin:/sbin:/usr/sbin \
-$([ $install = alpine ] && echo /bin/sh || echo /bin/bash) \
---login
-EOF
+		unset LD_PRELOAD
+		#--link2symlink
+		exec proot \
+		\$([ -z \$@ ] && echo "-0") \
+		-r $(realpath "$prefixdir") \
+		-b $HOME -b /dev -b /proc -b /storage -b /sys -w / \
+		/usr/bin/env -i HOME=/root TERM=\$TERM LANG=en_US.UTF-8 \
+		PATH=/bin:/usr/bin:/sbin:/usr/sbin \
+		$([ $install = alpine ] && echo /bin/sh || echo /bin/bash) \
+		--login
+	EOF
 
 	termux-fix-shebang "$script"
 	chmod +x "$script"
@@ -310,6 +305,7 @@ EOF
 
 
 
+## beginning
 cd
 chkpak proot wget tar bsdtar coreutils grep curl
 getarch
