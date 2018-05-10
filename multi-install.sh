@@ -289,14 +289,22 @@ entryscript() {
 
 		unset LD_PRELOAD
 		#--link2symlink
-		exec proot \
-		\$([ -z \$@ ] && echo "-0") \
-		-r $(realpath "$prefixdir") \
-		-b $HOME -b /dev -b /proc -b /storage -b /sys -w / \
-		/usr/bin/env -i HOME=/root TERM=\$TERM LANG=en_US.UTF-8 \
-		PATH=/bin:/usr/bin:/sbin:/usr/sbin \
-		$([ $install = alpine ] && echo /bin/sh || echo /bin/bash) \
-		--login
+
+		pr_exec="exec proot "
+		## root shell unless you pass any argument (maybe make it more complex lol)
+		pr_exec+="\$([ -z \$@ ] && echo "-0") "
+		## set root to the root of the prefix
+		pr_exec+="-r $(realpath "$prefixdir") "
+		## bind all that good stuff
+		pr_exec+="-b $HOME -b /dev -b /proc -b /storage -b /sys -w / "
+		## add stuff to the environment
+		pr_exec+="/usr/bin/env -i HOME=/root TERM=\$TERM LANG=en_US.UTF-8 "
+		pr_exec+="PATH=/bin:/usr/bin:/sbin:/usr/sbin "
+		## bash unless it's alpine
+		pr_exec+="$([ $install = alpine ] && echo "/bin/sh " || echo "/bin/bash ")"
+		## login shell
+		pr_exec+="--login"
+		\$pr_exec
 	EOF
 
 	termux-fix-shebang "$script"
