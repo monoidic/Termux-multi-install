@@ -67,6 +67,8 @@ printusage() {
 		(The selection marked in [square brackets] is the default)
 		Available prefixes:
 		$availabledists
+		Additionally, you can pass the distro of choice and its version (in that order)
+		as arguments to this script to make the automatic installing of prefixes easier
 	EOM
 }
 
@@ -102,8 +104,8 @@ distroselect() {
 
 releaseselect() {
 	if [ $install = alpine ]; then case "$_release" in
-			[Ee]*) release="edge" ;;
-			*3*|*7*|*) release="v3.7" ;;
+			*6*) release="3.6.0" ;;
+			*7*|*) release="3.7.0" ;;
 		esac
 	elif [ $install = arch ]; then release="current"
 	elif [ $install = fedora ]; then case "$_release" in
@@ -137,7 +139,7 @@ prefixexists() {
 
 dldata() {
 	if [ $install = alpine ]; then
-		tarurl="https://nl.alpinelinux.org/alpine/${release}/releases/${arch}/alpine-minirootfs-3.7.0-${arch}.tar.gz"
+		tarurl="https://nl.alpinelinux.org/alpine/v${release%.*}/releases/${arch}/alpine-minirootfs-${release}-${arch}.tar.gz"
 		sumurl="${tarurl}.sha512"
 		sum="sha512sum"
 	elif [ $install = arch ]; then
@@ -328,7 +330,7 @@ fi
 
 distroselect
 
-if [ $releases = "[current]" ]; then :
+if [ "$releases" = "[current]" ]; then :
 elif [ "$2" ]; then
 	_release="$2"
 else
