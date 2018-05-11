@@ -75,7 +75,7 @@ printusage() {
 distroselect() {
 	while true; do case "$selection" in
 		[Aa][Ll]*) install=alpine
-			releases="[3.7], edge"
+			releases="3.6, [3.7]"
 			break ;;
 		[Aa][Rr]*) install=arch
 			releases="[current]"
